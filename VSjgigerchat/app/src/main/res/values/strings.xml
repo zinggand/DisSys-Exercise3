@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">VS jgiger chat</string>
+    <string name="action_settings">Settings</string>
+    <string name="joinButtonText">Join</string>
+    <string name="settingsButtonText">Settings</string>
+    <string name="main_activity_text_view_text">Choose a username to connect to the server.</string>
+    <string name="chat_activity_title">Chat Activity</string>
+    <string name="settings_activity_title">Settings</string>
+    <string name="port_picker_description">Pick the port on which the server should be addressed</string>
+    <string name="address_picker_description">Pick the address of the server you want to connect to</string>
+    <string name="server_address">Server address</string>
+    <string name="server_port">Port</string>
+    <string name="username_hint">username</string>
+</resources>
