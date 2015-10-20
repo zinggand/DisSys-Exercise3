@@ -104,5 +104,69 @@ public class MainActivity extends ActionBarActivity {
         // todo: change to Settings Activity, pass all the saved Settings with myIntent(addr + port), and use those there to display current Settings
         startActivity(myIntent);
     }
+    
+    private class Udp extends AsyncTask {
+
+        @Override
+        protected Object doInBackground(Object[] params) {
+            String username=sharedPreferences.getString(USERNAME_IDENTIFIER, null);
+            String portString = sharedPreferences.getString(PORT_IDENTIFIER, null);
+            int port =Integer.parseInt(portString);
+            int ownPort= Integer.parseInt(getPort());
+            String ip = sharedPreferences.getString(ADDRESS_IDENTIFIER, null);
+            DatagramSocket socket = null;
+            String uuidString = sharedPreferences.getString(UUID_IDENTIFIER, null);
+            if(uuidString==null){
+                UUID uuid= UUID.randomUUID();
+                uuidString= uuid.toString();
+                SharedPreferences.Editor editor = sharedPreferences.edit();
+                editor.putString(UUID_IDENTIFIER, uuidString);
+                editor.apply();
+            }
+            else{
+                UUID uuid=UUID.fromString(uuidString);
+            }
+
+
+            try {
+                socket = new DatagramSocket(ownPort);
+            } catch (SocketException e) {
+                e.printStackTrace();
+            }
+            try {
+                socket.setSoTimeout(timeout);
+            } catch (SocketException e) {
+                e.printStackTrace();
+            }
+            /*JSONObject jsonHeader = new JSONObject();
+            JSONObject packetToSend = new JSONObject();
+            JSONObject jsonBody = new JSONObject();
+            try {
+                jsonHeader.put("username", username);
+                jsonHeader.put("uuid", uuidString);
+                jsonHeader.put("timestamp", "{}");
+                jsonHeader.put("type", MessageTypes.REGISTER);
+                packetToSend.put("header", jsonHeader);
+                packetToSend.put("body",jsonBody );
+
+
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }*/
+            byte[] buffer= new byte[256];
+            DatagramPacket packetToSend = new DatagramPacket(buffer, buffer.length);
+            //System.out.println(json.toString());
+            try {
+                socket.send(packetToSend);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            //socket.receive(getack);
+
+            return null;
+            //todo return statements
+        }
+
+    }
 
 }
