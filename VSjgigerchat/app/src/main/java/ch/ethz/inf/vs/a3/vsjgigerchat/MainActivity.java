@@ -20,12 +20,13 @@ public class MainActivity extends ActionBarActivity {
     private Intent myIntent; // used to either jump to Settings, or ChatActivity
     private SharedPreferences sharedPreferences; // used to store Settings
     private EditText usernameEdit;
+    private EditText addressEdit;
 
-    public final String SETTINGS_UPDATE = "Settings_need_update";
-    public final String ADDRESS_IDENTIFIER = "Transmitted_Address";
-    public final String PORT_IDENTIFIER = "Transmitted_Port";
-    public final String USERNAME_IDENTIFIER = "Username_Identifier";
-    public final String SETTINGS_FILE_NAME = "VSjgigerChatSettings";
+    public static final String SETTINGS_UPDATE = "Settings_need_update";
+    public static final String ADDRESS_IDENTIFIER = "Transmitted_Address";
+    public static final String PORT_IDENTIFIER = "Transmitted_Port";
+    public static final String USERNAME_IDENTIFIER = "Username_Identifier";
+    public static final String SETTINGS_FILE_NAME = "VSjgigerChatSettings";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,7 +43,6 @@ public class MainActivity extends ActionBarActivity {
         else
             usernameEdit.setHint(R.string.username_hint);
 
-
         System.out.println("DEBUG: MainActivity, onCreate: username is "+ username);
 
 
@@ -51,11 +51,26 @@ public class MainActivity extends ActionBarActivity {
 
     }
 
+    @Override public void onResume(){
+        super.onResume();
+        myIntent = getIntent();
+        String address = myIntent.getStringExtra(ADDRESS_IDENTIFIER);
+        String port = myIntent.getStringExtra(PORT_IDENTIFIER);
+        setAddress(address);
+        setPort(port);
+    }
+
     private void setAddress(String newAddress){
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString(ADDRESS_IDENTIFIER, newAddress);
+        editor.apply();
         // todo
     }
 
     private void setPort(String newPort){
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString(PORT_IDENTIFIER, newPort);
+        editor.apply();
         // todo
     }
 
@@ -68,11 +83,13 @@ public class MainActivity extends ActionBarActivity {
     }
 
     private String getAddress(){
+        String address = sharedPreferences.getString(ADDRESS_IDENTIFIER, null);
         // todo
         return null;
     }
 
     private String getPort(){
+        String port = sharedPreferences.getString(PORT_IDENTIFIER, "4446");
         // todo
         return null;
     }
@@ -91,82 +108,25 @@ public class MainActivity extends ActionBarActivity {
             setUsername(usernameEdit.getText().toString());
 
         myIntent = new Intent(this, ChatActivity.class);
+        myIntent.putExtra(ADDRESS_IDENTIFIER, getAddress());
+        myIntent.putExtra(PORT_IDENTIFIER, getPort());
+        myIntent.putExtra(USERNAME_IDENTIFIER, getUsername());
         // todo: pass all the needed Infos that are saved in sharedPrefs (addr + port + username).
         startActivity(myIntent);
     }
 
     public void onSettingsClick(View v){
+        if(getUsername() != null || usernameEdit.getText().toString() != null)
+            setUsername(usernameEdit.getText().toString());
         // todo: save username to sharedprefs
 
 
         System.out.println("DEBUG: MainActivity, onSettingsClick: started executing.");
         myIntent = new Intent(this, SettingsActivity.class);
+        myIntent.putExtra(ADDRESS_IDENTIFIER, getAddress());
+        myIntent.putExtra(PORT_IDENTIFIER, getPort());
         // todo: change to Settings Activity, pass all the saved Settings with myIntent(addr + port), and use those there to display current Settings
         startActivity(myIntent);
-    }
-    
-    private class Udp extends AsyncTask {
-
-        @Override
-        protected Object doInBackground(Object[] params) {
-            String username=sharedPreferences.getString(USERNAME_IDENTIFIER, null);
-            String portString = sharedPreferences.getString(PORT_IDENTIFIER, null);
-            int port =Integer.parseInt(portString);
-            int ownPort= Integer.parseInt(getPort());
-            String ip = sharedPreferences.getString(ADDRESS_IDENTIFIER, null);
-            DatagramSocket socket = null;
-            String uuidString = sharedPreferences.getString(UUID_IDENTIFIER, null);
-            if(uuidString==null){
-                UUID uuid= UUID.randomUUID();
-                uuidString= uuid.toString();
-                SharedPreferences.Editor editor = sharedPreferences.edit();
-                editor.putString(UUID_IDENTIFIER, uuidString);
-                editor.apply();
-            }
-            else{
-                UUID uuid=UUID.fromString(uuidString);
-            }
-
-
-            try {
-                socket = new DatagramSocket(ownPort);
-            } catch (SocketException e) {
-                e.printStackTrace();
-            }
-            try {
-                socket.setSoTimeout(timeout);
-            } catch (SocketException e) {
-                e.printStackTrace();
-            }
-            /*JSONObject jsonHeader = new JSONObject();
-            JSONObject packetToSend = new JSONObject();
-            JSONObject jsonBody = new JSONObject();
-            try {
-                jsonHeader.put("username", username);
-                jsonHeader.put("uuid", uuidString);
-                jsonHeader.put("timestamp", "{}");
-                jsonHeader.put("type", MessageTypes.REGISTER);
-                packetToSend.put("header", jsonHeader);
-                packetToSend.put("body",jsonBody );
-
-
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }*/
-            byte[] buffer= new byte[256];
-            DatagramPacket packetToSend = new DatagramPacket(buffer, buffer.length);
-            //System.out.println(json.toString());
-            try {
-                socket.send(packetToSend);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            //socket.receive(getack);
-
-            return null;
-            //todo return statements
-        }
-
     }
 
 }
