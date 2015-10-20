@@ -24,12 +24,32 @@ public class SettingsActivity extends ActionBarActivity {
         addressEdit = (EditText) findViewById(R.id.address_picker);
         portEdit = (EditText) findViewById(R.id.port_picker);
 
+        myIntent = getIntent();
+        String address = myIntent.getStringExtra(MainActivity.ADDRESS_IDENTIFIER);
+        String port = myIntent.getStringExtra(MainActivity.PORT_IDENTIFIER);
+
+        if(address!= null)
+            addressEdit.setText(address);
+        else
+            addressEdit.setHint(R.string.address_hint);
+
+        if(port!=null)
+            portEdit.setText(port);
+        else
+            portEdit.setHint(R.string.port_hint);
         // todo: read the delivered values from myIntent. display editText's with those values
     }
 
     @Override
     public void onDestroy(){
         super.onDestroy();
+        address = addressEdit.getText().toString();
+        port = portEdit.getText().toString();
+        myIntent = new Intent(this, MainActivity.class);
+
+        myIntent.putExtra(MainActivity.ADDRESS_IDENTIFIER, address);
+        myIntent.putExtra(MainActivity.PORT_IDENTIFIER, port);
+        startActivity(myIntent);
         // todo: send the current values from the text edits back to main activity, using myIntent
     }
 
