@@ -38,4 +38,10 @@
         android:id="@+id/port_picker"
         android:hint="@string/server_port"/>
 
+    <Button
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_save_button_text"
+        android:onClick="onSaveClick"/>
+
 </LinearLayout>
