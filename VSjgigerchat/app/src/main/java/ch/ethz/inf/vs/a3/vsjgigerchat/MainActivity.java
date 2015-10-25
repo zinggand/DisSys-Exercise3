@@ -13,12 +13,16 @@ import android.os.AsyncTask;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.json.simple.JSONValue;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketException;
+import java.net.UnknownHostException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import ch.ethz.inf.vs.a3.vsjgigerchat.message.MessageTypes;
@@ -37,10 +41,9 @@ public class MainActivity extends ActionBarActivity {
     public static final String USERNAME_DEFAULT = null;
     public static final String ADDRESS_DEFAULT = null;
     public static final String PORT_DEFAULT = "4446"; // todo: check if we really should implement this as the default value...
-    public final int timeout=5000;
-    public final String ACK_USERNAME = "server";
     public final String ACK_TYPE = "ack";
     public final String UUID_IDENTIFIER = "Uuid_Identifier";
+    public boolean registering = true;
     public boolean registered;
 
 
@@ -117,6 +120,11 @@ public class MainActivity extends ActionBarActivity {
         myIntent.putExtra(MainActivity.USERNAME_IDENTIFIER, getUsername());
         myIntent.putExtra(MainActivity.ADDRESS_IDENTIFIER, getAddress());
         myIntent.putExtra(MainActivity.PORT_IDENTIFIER, getPort());
+		AsyncWorker worker = new AsyncWorker();
+		String register = registerMessage(true);
+        byte[] message = register.getBytes();
+        registering=true;
+		worker.execute(message);
         startActivity(myIntent);
     }
 
@@ -131,73 +139,97 @@ public class MainActivity extends ActionBarActivity {
     }
 
     public void onDeregisterClick(View view) {
-        AsyncWorker worker = new AsyncWorker();
-        JSONObject deregister = registerMessage(false);
-        worker.execute(deregister);
+        if(registered==true){
+            registering=false;
+			AsyncWorker worker = new AsyncWorker();
+			String deregister = registerMessage(false);
+            byte[] message = deregister.getBytes();
+			worker.execute(message);
+		}
+		else{
+			Toast.makeText(getApplicationContext(), "You aren't registered", Toast.LENGTH_SHORT).show();
+		}
     }
 
-    private class AsyncWorker extends AsyncTask {
+    
+class AsyncWorker extends AsyncTask <byte[],Void, Boolean> {
 
-        @Override
-        protected Object doInBackground(Object[] params) {
-            int ownPort= Integer.parseInt(getPort());
-            DatagramSocket socket = null;
+
+        protected Boolean doInBackground(byte[]... params) {
+            String portString = sharedPreferences.getString(PORT_IDENTIFIER, PORT_DEFAULT);
+            System.out.println("DEBUG: MainActivity, AsyncWorker: port "+portString);
+            int port =Integer.parseInt(portString);
+            InetAddress ip = null;
+            DatagramSocket socket;
+            DatagramPacket packet=null;
             try {
-                socket = new DatagramSocket(ownPort);
-                socket.setSoTimeout(timeout);
+                String ipString=sharedPreferences.getString(ADDRESS_IDENTIFIER, ADDRESS_DEFAULT);
+                ip =InetAddress.getByName(ipString);
+            } catch (UnknownHostException e) {
+                e.printStackTrace();
+            }
+            try {
+                socket = new DatagramSocket();
+                try{
+                    socket.setSoTimeout(NetworkConsts.SOCKET_TIMEOUT);
+                    socket.connect(ip, port);
+                    byte[] packetToSend = params[0];
+                    if(packetToSend!=null){
+                        packet = new DatagramPacket(packetToSend, packetToSend.length, ip, port);
+                        socket.send(packet);
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                byte[] buffer = new byte[1024];
+                DatagramPacket receivedPacket = new DatagramPacket(buffer, buffer.length);
+                try {
+                    socket.receive(receivedPacket);
+                    String ack= new String(receivedPacket.getData(), 0 , receivedPacket.getLength());
+                    System.out.println("DEBUG: MainActivity, AsyncWorker: packet received " + ack);
+                    JSONObject jsonAck = null;
+                    JSONObject jsonheader = null;
+                    try {
+                        jsonAck = new JSONObject(ack);
+                        jsonheader=new JSONObject(jsonAck.get("header").toString());
+                        String ackType =jsonheader.getString("type");
+                        if(ackType.equals(ACK_TYPE)) {
+                            if (registering){
+                                System.out.println("DEBUG: MainActivity, AsyncWorker: registered");
+                                registered=true;}
+                            else{
+                                System.out.println("DEBUG: MainActivity, AsyncWorker: deregistered");
+                                registered=false;
+                            }
+                        }
+                        else{
+                            System.out.println("DEBUG: MainActivity, AsyncWorker: Error");
+                        }
+
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                } catch (IOException e) {
+                    System.out.println("DEBUG: MainActivity, AsyncWorker: registration wasn't successful");
+                    e.printStackTrace();
+                }
+
             } catch (SocketException e) {
                 e.printStackTrace();
             }
-            JSONObject packetToSend =(JSONObject) params[0];
-            byte[] buffer= new byte[2024];
-            try {
-                buffer = packetToSend.toString().getBytes("UTF8");
-            } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
-            }
-            DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-            //System.out.println(json.toString());
-            try {
-                socket.send(packet);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            DatagramPacket receivedPacket = new DatagramPacket(buffer, buffer.length);
-            try {
-                socket.receive(receivedPacket);
-            } catch (IOException e) {
-                Toast.makeText(getApplicationContext(),"Registration wasn't successful... Please try again", Toast.LENGTH_SHORT).show();
-                e.printStackTrace();
-            }
-            String ack = new String(receivedPacket.getData(), 0, receivedPacket.getLength());
-            JSONObject jsonAck = null;
-            try {
-                jsonAck = new JSONObject(ack);
-                String ackUsername = jsonAck.getString("username");
-                String ackUuid = jsonAck.getString("uuid");
-                String ackType = jsonAck.getString("type");
-                if(ackUsername==ACK_USERNAME&&ackUuid==packetToSend.getString("uuid")&&ackType==ACK_TYPE) {
-                    if (packetToSend.getString("type") == "register")
-                        Toast.makeText(getApplicationContext(), "registered", Toast.LENGTH_SHORT).show();
-                    if (packetToSend.getString("type") == "deregister") {
-                        Toast.makeText(getApplicationContext(), "deregistered", Toast.LENGTH_SHORT).show();
-                    }
-                }
-
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-            return ack;
+            return true;
         }
 
     }
+
     private JSONObject registerMessage(boolean register) {
+        System.out.println("DEBUG: MainActivity, registerMessage: start");
         String username=sharedPreferences.getString(USERNAME_IDENTIFIER, null);
-        String portString = sharedPreferences.getString(PORT_IDENTIFIER, null);
+        String portString = sharedPreferences.getString(PORT_IDENTIFIER, PORT_DEFAULT);
         int port =Integer.parseInt(portString);
-        String ip = sharedPreferences.getString(ADDRESS_IDENTIFIER, null);
+        String ip = sharedPreferences.getString(ADDRESS_IDENTIFIER, ADDRESS_DEFAULT);
         String uuidString = sharedPreferences.getString(UUID_IDENTIFIER, null);
+        String type=null;
         if(uuidString==null){
             UUID uuid= UUID.randomUUID();
             uuidString= uuid.toString();
@@ -208,28 +240,31 @@ public class MainActivity extends ActionBarActivity {
         else{
             UUID uuid=UUID.fromString(uuidString);
         }
-        JSONObject jsonHeader = new JSONObject();
-        JSONObject packetToSend = new JSONObject();
-        JSONObject jsonBody = new JSONObject();
-        try {
-            jsonHeader.put("username", username);
-            jsonHeader.put("uuid", uuidString);
-            jsonHeader.put("timestamp", "{}");
+        System.out.println("DEBUG: MainActivity, registerMessage: new uuid "+uuidString);
+        if(register){
+            type=MessageTypes.REGISTER;
+        }
+        else{
+            type=MessageTypes.DEREGISTER;
+        }
+        JSONObject obj = null;
+            Map map = new LinkedHashMap();
+            Map headerMap = new LinkedHashMap();
+            headerMap.put("username", username);
+            headerMap.put("uuid", uuidString);
+            headerMap.put("timestamp", "{}");
             if(register){
-                jsonHeader.put("type", MessageTypes.REGISTER);
+                headerMap.put("type", MessageTypes.REGISTER);
             }
             else{
-                jsonHeader.put("type", MessageTypes.DEREGISTER);
+                headerMap.put("type", MessageTypes.DEREGISTER);
             }
-
-            packetToSend.put("header", jsonHeader);
-            packetToSend.put("body",jsonBody );
-
-
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-        return packetToSend;
+            JSONObject jsonBody = new JSONObject();
+            map.put("header", headerMap);
+            map.put("body", jsonBody);
+            String jsonText = JSONValue.toJSONString(map);
+            System.out.println("DEBUG: MainActivity, registerMessage: json: " +jsonText);
+            return jsonText;
     }
 }
 
